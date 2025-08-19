@@ -1,0 +1,18 @@
+{
+  "name": "lemman-app-v6.2",
+  "private": true,
+  "version": "6.2.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "vite": "^5.2.0"
+  }
+}

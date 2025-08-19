@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LEMMAN – v6.2</title>
+    <link rel="manifest" href="/lemman-app3/manifest.json">
+      <meta name="theme-color" content="#111111" />
+    <script type="module" crossorigin src="/lemman-app3/assets/index-Cs_CKY-4.js"></script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').catch(()=>{});
+        });
+      }
+    </script>
+  </body>
+</html>
