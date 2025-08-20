@@ -1,4 +1,18 @@
 import React, { useMemo, useState, useEffect } from 'react'
+import { loadRemoteDB, saveRemoteDB } from './persist.js'
+
+// Safe-merge remote DB with local SEED (prevents blank screen on incomplete state)
+function mergeDB(remote, fallback) {
+  try {
+    if (!remote || typeof remote !== 'object') return fallback;
+    const merged = { ...fallback, ...remote };
+    const arrKeys = ['commesse','cantieri','weeklyShifts','tasks','reports','notifications','posts'];
+    for (const k of arrKeys) {
+      if (!Array.isArray(merged[k])) merged[k] = fallback[k];
+    }
+    return merged;
+  } catch { return fallback; }
+}
 
 // ---------- Helpers ----------
 function isoWeekInfo(d = new Date()) {
@@ -117,8 +131,11 @@ export default function App(){
   const [route, setRoute] = useState('home');
 
   const [db, setDb] = useState(()=> loadDB(SEED));
-  useEffect(()=>{ saveDB(db);
-  saveRemoteDB(db); if(typeof window!=='undefined'){ window._setDb = setDb; } }, [db]);
+  useEffect(() => {
+  saveDB(db);
+  saveRemoteDB(db);
+  if (typeof window !== 'undefined') { window._setDb = setDb; }
+}, [db]);
 
   const curWeek = weekStr(isoWeekInfo());
   const nextWeekStr = nextWeek(curWeek);
