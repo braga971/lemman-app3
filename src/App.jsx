@@ -117,27 +117,8 @@ export default function App(){
   const [route, setRoute] = useState('home');
 
   const [db, setDb] = useState(()=> loadDB(SEED));
-  useEffect(() => {
-    (async () => {
-      try {
-        const remote = await loadRemoteDB(SEED);
-        if (remote) setDb(remote);
-      } catch (_) {}
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-const [db, setDb] = useState(()=> loadDB(SEED));
-  useEffect(() => {
-    (async () => {
-      try {
-        const remote = await loadRemoteDB(SEED);
-        if (remote) setDb(remote);
-      } catch (_) {}
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(()=>{ saveDB(db); if(typeof window!=='undefined'){ window._setDb = setDb; } }, [db]);
+  useEffect(()=>{ saveDB(db);
+  saveRemoteDB(db); if(typeof window!=='undefined'){ window._setDb = setDb; } }, [db]);
 
   const curWeek = weekStr(isoWeekInfo());
   const nextWeekStr = nextWeek(curWeek);
