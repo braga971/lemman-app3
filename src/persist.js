@@ -1,10 +1,9 @@
 // src/persist.js
-import { supabase } from './supabaseClient'
+import { supabase } from './supabaseClient.js'
 
-// Chiave condivisa per l’ambiente/azienda
 const KEY = 'lemman'
 
-// carica dallo stato remoto; se non esiste, crea con il fallback
+// Carica lo stato remoto; se manca crea la riga con il fallback (SEED)
 export async function loadRemoteDB(fallback) {
   try {
     const { data, error } = await supabase
@@ -25,19 +24,24 @@ export async function loadRemoteDB(fallback) {
   }
 }
 
-let _saveTimer = null
+let _timer
 export async function saveRemoteDB(db) {
-  if (_saveTimer) clearTimeout(_saveTimer)
-  _saveTimer = setTimeout(async () => {
+  if (_timer) clearTimeout(_timer)
+  _timer = setTimeout(async () => {
     try {
-      // upsert esplicita con onConflict sulla PK
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('app_state')
         .upsert(
           { key: KEY, state: db, updated_at: new Date().toISOString() },
           { onConflict: 'key' }
         )
-      if (error) console.warn('[persist] saveRemoteDB error:', error.message)
+        .select('updated_at') // ritorna la riga per confermare la write
+
+      if (error) {
+        console.warn('[persist] saveRemoteDB error:', error.message)
+      } else {
+        console.log('[persist] saved at:', data?.[0]?.updated_at)
+      }
     } catch (e) {
       console.warn('[persist] saveRemoteDB exception:', e?.message || e)
     }
