@@ -1,16 +1,17 @@
-# LEMMAN – v6.2 (React + Vite) – Offline-first + Admin posizioni + Dashboard + Report
+# Lemman • Full Supabase App
 
-Credenziali demo:
-- Responsabile: responsabile / lemman
-- Dipendente:  mario.rossi  / lemman
+## Setup rapido
+1) `npm i`
+2) Copia `.env.example` in `.env` e inserisci le chiavi Supabase
+3) In Supabase esegui `supabase_sql.sql`
+4) Abilita Realtime su: `commesse`, `posizioni`, `rapportini`, `app_state`
+5) Crea utenti in Auth → Users
+6) `npm run dev`
 
-Avvio rapido:
-1) npm install
-2) npm run dev
-Apri http://localhost:5173 (o l'URL mostrato in console).
-
-Novità v6.2:
-- **Posizioni di commessa**: il responsabile può aggiungere/eliminare posizioni per ogni commessa (menu Amministrazione).
-- **Offline-first**: salvataggio locale (localStorage) + Service Worker per aprire l'app anche senza rete.
-- **Dashboard responsabile**: KPI, attività del giorno, turni della settimana corrente.
-- **Report ore**: riepilogo ore per **commessa/posizione** nella settimana corrente (menu Report).
+## Funzioni incluse
+- CRUD **Commesse**, **Posizioni**, **Rapportini**
+- Filtri "posizioni per commessa"
+- Login email/password
+- **Realtime** su tutte le tabelle
+- **Persistenza** stato UI in `app_state` (chiave `lemman`)
+- **Export CSV** rapportini
