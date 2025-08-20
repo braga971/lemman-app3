@@ -830,7 +830,7 @@ function Dashboard({ db, curWeek }){
           <table><thead><tr><th>Dipendente</th><th>Ore</th><th style={{width:220}}>Grafico</th></tr></thead><tbody>
             {Object.entries(agg).map(([k,v])=> <tr key={k}><td>{k}</td><td>{v}</td><td><Bar value={v} max={max} /></td></tr>)}
           </tbody></table></>
-    }</div></div>
+    })()}</div></div>
   </div>
 }
 
