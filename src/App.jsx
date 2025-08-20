@@ -1,5 +1,4 @@
 import React, { useMemo, useState, useEffect } from 'react'
-import { loadRemoteDB, saveRemoteDB } from './persist'
 
 // ---------- Helpers ----------
 function isoWeekInfo(d = new Date()) {
@@ -119,10 +118,26 @@ export default function App(){
 
   const [db, setDb] = useState(()=> loadDB(SEED));
   useEffect(() => {
-  saveDB(db);
-  saveRemoteDB(db);
-  if (typeof window !== 'undefined') { window._setDb = setDb; }
-}, [db]);
+    (async () => {
+      try {
+        const remote = await loadRemoteDB(SEED);
+        if (remote) setDb(remote);
+      } catch (_) {}
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+const [db, setDb] = useState(()=> loadDB(SEED));
+  useEffect(() => {
+    (async () => {
+      try {
+        const remote = await loadRemoteDB(SEED);
+        if (remote) setDb(remote);
+      } catch (_) {}
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(()=>{ saveDB(db); if(typeof window!=='undefined'){ window._setDb = setDb; } }, [db]);
 
   const curWeek = weekStr(isoWeekInfo());
   const nextWeekStr = nextWeek(curWeek);
