@@ -1,59 +1,62 @@
-import React, { useMemo, useState, useEffect } from 'react'
+import React, { useMemo, useState, useEffect, useRef } from 'react'
+
+// === Supabase sync ===
 import { loadRemoteDB, saveRemoteDB } from './persist.js'
+import { supabase } from './supabaseClient.js'
+
+// ---------- Helpers ----------
+function isoWeekInfo(d = new Date()) {
+  const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()))
+  const dayNum = date.getUTCDay() || 7
+  date.setUTCDate(date.getUTCDate() + 4 - dayNum)
+  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1))
+  const weekNo = Math.ceil((((date - yearStart) / 86400000) + 1) / 7)
+  return { year: date.getUTCFullYear(), week: weekNo }
+}
+const weekStr = ({ year, week }) => `${year}-W${String(week).padStart(2, '0')}`
+const weekNum = (ws) => { const m = /^(\d{4})-W(\d{2})$/.exec(ws || ""); if (!m) return 0; return Number(m[1]) * 100 + Number(m[2]); }
+function nextWeek(ws) {
+  const m = /^(\d{4})-W(\d{2})$/.exec(ws); if (!m) return ws
+  let y = +m[1], w = +m[2]; w += 1; if (w > 53) { y += 1; w = 1 }
+  return `${y}-W${String(w).padStart(2, '0')}`
+}
+const uid = () => Math.random().toString(36).slice(2)
+const today = () => new Date().toISOString().slice(0, 10)
 
 // Safe-merge remote DB with local SEED (prevents blank screen on incomplete state)
 function mergeDB(remote, fallback) {
   try {
-    if (!remote || typeof remote !== 'object') return fallback;
-    const merged = { ...fallback, ...remote };
-    const arrKeys = ['commesse','cantieri','weeklyShifts','tasks','reports','notifications','posts'];
+    if (!remote || typeof remote !== 'object') return fallback
+    const merged = { ...fallback, ...remote }
+    const arrKeys = ['commesse','cantieri','weeklyShifts','tasks','reports','notifications','posts']
     for (const k of arrKeys) {
-      if (!Array.isArray(merged[k])) merged[k] = fallback[k];
+      if (!Array.isArray(merged[k])) merged[k] = fallback[k]
     }
-    return merged;
-  } catch { return fallback; }
+    return merged
+  } catch { return fallback }
 }
-
-// ---------- Helpers ----------
-function isoWeekInfo(d = new Date()) {
-  const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
-  const dayNum = date.getUTCDay() || 7;
-  date.setUTCDate(date.getUTCDate() + 4 - dayNum);
-  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
-  const weekNo = Math.ceil((((date - yearStart) / 86400000) + 1) / 7);
-  return { year: date.getUTCFullYear(), week: weekNo };
-}
-const weekStr = ({ year, week }) => `${year}-W${String(week).padStart(2, '0')}`;
-const weekNum = (ws) => { const m = /^(\d{4})-W(\d{2})$/.exec(ws || ""); if (!m) return 0; return Number(m[1]) * 100 + Number(m[2]); };
-function nextWeek(ws) {
-  const m = /^(\d{4})-W(\d{2})$/.exec(ws); if (!m) return ws;
-  let y = +m[1], w = +m[2]; w += 1; if (w > 53) { y += 1; w = 1; }
-  return `${y}-W${String(w).padStart(2, '0')}`;
-}
-const uid = () => Math.random().toString(36).slice(2);
-const today = () => new Date().toISOString().slice(0, 10);
 
 // Local persistence (offline-first light)
-const STORAGE_KEY = 'lemman-db-v6.2';
+const STORAGE_KEY = 'lemman-db-v6.2'
 function loadDB(fallback) {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : fallback;
-  } catch { return fallback; }
+    const raw = localStorage.getItem(STORAGE_KEY)
+    return raw ? JSON.parse(raw) : fallback
+  } catch { return fallback }
 }
 function saveDB(db) {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(db)); } catch {}
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(db)) } catch {}
 }
 
 async function readImageAsDataURL(file) {
   return await new Promise((resolve, reject) => {
     try {
-      const fr = new FileReader();
-      fr.onload = () => resolve(fr.result);
-      fr.onerror = () => reject(new Error('Lettura immagine fallita'));
-      fr.readAsDataURL(file);
-    } catch (e) { reject(e); }
-  });
+      const fr = new FileReader()
+      fr.onload = () => resolve(fr.result)
+      fr.onerror = () => reject(new Error('Lettura immagine fallita'))
+      fr.readAsDataURL(file)
+    } catch (e) { reject(e) }
+  })
 }
 
 // ---------- Utenti demo ----------
@@ -61,11 +64,11 @@ const USERS = [
   { username: 'mario.rossi', pwd: 'lemman', role: 'Dipendente', name: 'Mario Rossi' },
   { username: 'anna.verdi', pwd: 'lemman', role: 'Dipendente', name: 'Anna Verdi' },
   { username: 'responsabile', pwd: 'lemman', role: 'Responsabile', name: 'Responsabile' },
-];
+]
 
 // ---------- Seed ----------
 const SEED = (() => {
-  const curW = weekStr(isoWeekInfo());
+  const curW = weekStr(isoWeekInfo())
   return {
     commesse: [
       { id: uid(), code: 'C-2405-ALFA', desc: 'Reattore multilayer – ALFA', active: true, boundSite: 'Officina Padova', lockSite: true, posizioni: [{ id: uid(), name: 'SALDATURA' }, { id: uid(), name: 'MONTAGGIO' }] },
@@ -85,8 +88,8 @@ const SEED = (() => {
     ],
     notifications: [],
     posts: [{ id: uid(), title: 'Benvenuti nella nuova app LEMMAN', body: 'Gestione turni/rapportini/attività.', author: 'Responsabile', ts: Date.now() }],
-  };
-})();
+  }
+})()
 
 // ---------- Styles ----------
 const styles = `
@@ -96,7 +99,7 @@ nav{background:var(--brand);color:#fff;display:flex;gap:10px;padding:10px 12px;p
 nav a,nav button{color:#fff;text-decoration:none;padding:6px 10px;border-radius:8px;border:0;background:transparent;white-space:nowrap}
 nav a:hover{background:rgba(255,255,255,.1)}.active{background:rgba(255,255,255,.12)}
 .container{padding:14px;max-width:1200px;margin:0 auto}
-.grid{display:grid;gap:14px}@media(min-width:1000px){.cols-2{grid-template-columns:1fr 1fr} .cols-3{grid-template-columns:1fr 1fr 1fr}}
+.grid{display:grid;gap:14px}@media(min-width:1000px){.cols-2{grid-template-columns:1fr 1fr}.cols-3{grid-template-columns:1fr 1fr 1fr}}
 .card{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:0 1px 0 #00000008;overflow:hidden}
 .card h3{margin:0;padding:12px 14px 0;font-size:16px}.card .body{padding:10px 14px 14px}
 table{width:100%;border-collapse:collapse}th,td{border-top:1px solid var(--line);padding:8px;text-align:left}
@@ -104,74 +107,111 @@ th{font-weight:600;color:var(--muted);background:#fafafa;position:sticky;top:0}
 input,select,textarea{padding:8px;border:1px solid var(--line);border-radius:10px;outline:none;max-width:100%}
 textarea{min-height:80px;width:100%}button{padding:8px 12px;border:0;border-radius:10px;background:#111;color:#fff;cursor:pointer}
 button.ghost{background:#fff;color:#111;border:1px solid var(--line)}.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.muted{color:var(--muted);font-size:12px}.pill{padding:2px 8px;border-radius10px;border:1px solid var(--line);font-size:12px}
+.muted{color:var(--muted);font-size:12px}.pill{padding:2px 8px;border-radius:10px;border:1px solid var(--line);font-size:12px}
 .pill.ok{border-color:#0a0;}
-:999px;font-size:12px;border:1px solid var(--line)}
 .badge{padding:2px 6px;border-radius:6px;font-size:12px}
 .badge.sent{background:#fff;border:1px solid var(--line)}.badge.appr{background:#e8f5e9;color:#2e7d32}
 .badge.mod{background:#fff3e0;color:#e65100}.badge.rej{background:#ffebee;color:#c62828}
 ul{margin:0;padding-left:18px}.right{margin-left:auto}
 small.code{font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background:#f0f0f0; padding:0 6px; border-radius:6px}
 img.preview{max-width:120px;max-height:120px;border:1px solid var(--line);border-radius:8px}
-`;
+`
 
 function StyleInjector(){
   useEffect(()=>{
-    const el = document.createElement('style');
-    el.innerHTML = styles;
-    document.head.appendChild(el);
-    return ()=>{ document.head.removeChild(el); }
-  },[]);
-  return null;
+    const el = document.createElement('style')
+    el.innerHTML = styles
+    document.head.appendChild(el)
+    return ()=>{ document.head.removeChild(el) }
+  },[])
+  return null
 }
 
 // ---------- App ----------
 export default function App(){
-  const [user, setUser] = useState(null);
-  const [route, setRoute] = useState('home');
+  const [user, setUser] = useState(null)
+  const [route, setRoute] = useState('home')
 
-  const [db, setDb] = useState(()=> loadDB(SEED));
+  const [db, setDb] = useState(()=> loadDB(SEED))
+  const applyingRemote = useRef(false)
+
+  // bootstrap: carica da Supabase e merge con SEED
   useEffect(() => {
-  saveDB(db);
-  saveRemoteDB(db);
-  if (typeof window !== 'undefined') { window._setDb = setDb; }
-}, [db]);
+    (async () => {
+      const remote = await loadRemoteDB(SEED)
+      const safe = mergeDB(remote, SEED)
+      applyingRemote.current = true
+      setDb(safe)
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
-  const curWeek = weekStr(isoWeekInfo());
-  const nextWeekStr = nextWeek(curWeek);
-  const todayStr = today();
-  const tomorrowStr = new Date(Date.now()+24*60*60*1000).toISOString().slice(0,10);
+  // salvataggio locale + remoto (con guardia anti ping-pong)
+  useEffect(() => {
+    if (applyingRemote.current) {
+      applyingRemote.current = false
+      saveDB(db)
+      if (typeof window !== 'undefined') { window._setDb = setDb }
+      return
+    }
+    saveDB(db)
+    saveRemoteDB(db)
+    if (typeof window !== 'undefined') { window._setDb = setDb }
+  }, [db])
 
-  useEffect(()=>{ // pulizia turni vecchi
-    setDb(prev => ({...prev, weeklyShifts: prev.weeklyShifts.filter(s => weekNum(s.week) >= weekNum(curWeek))}));
+  // Realtime: sincronizza in tempo reale tra dispositivi
+  useEffect(() => {
+    const ch = supabase
+      .channel('app_state_watch')
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'app_state', filter: 'key=eq.lemman' },
+        payload => {
+          const remote = payload.new?.state
+          if (!remote) return
+          applyingRemote.current = true
+          setDb(prev => mergeDB(remote, prev ?? SEED))
+        })
+      .subscribe()
+    return () => { supabase.removeChannel(ch) }
+  }, [])
+
+  // pulizia turni vecchi
+  useEffect(()=>{
+    const cw = weekStr(isoWeekInfo())
+    setDb(prev => ({...prev, weeklyShifts: prev.weeklyShifts.filter(s => weekNum(s.week) >= weekNum(cw))}))
     // eslint-disable-next-line
-  },[]);
+  },[])
 
-  const isResp = user?.role === 'Responsabile';
-  const myName = user?.name;
+  const curWeek = weekStr(isoWeekInfo())
+  const nextWeekStr = nextWeek(curWeek)
+  const todayStr = today()
+  const tomorrowStr = new Date(Date.now()+24*60*60*1000).toISOString().slice(0,10)
 
-  const myTasksToday = useMemo(()=> db.tasks.filter(t => t.dip===myName && t.date===today()), [db.tasks, myName]);
-  const toggleTask = (id) => setDb(p => ({...p, tasks: p.tasks.map(t => t.id===id? {...t, done:!t.done} : t)}));
+  const isResp = user?.role === 'Responsabile'
+  const myName = user?.name
+
+  const myTasksToday = useMemo(()=> db.tasks.filter(t => t.dip===myName && t.date===today()), [db.tasks, myName])
+  const toggleTask = (id) => setDb(p => ({...p, tasks: p.tasks.map(t => t.id===id? {...t, done:!t.done} : t)}))
 
   const myShifts = useMemo(()=>{
-    const cw = db.weeklyShifts.filter(s => s.dip===myName && s.week===curWeek);
-    const nw = db.weeklyShifts.filter(s => s.dip===myName && s.week===nextWeek(curWeek));
-    return { current: cw, next: nw };
-  }, [db.weeklyShifts, myName, curWeek]);
+    const cw = db.weeklyShifts.filter(s => s.dip===myName && s.week===curWeek)
+    const nw = db.weeklyShifts.filter(s => s.dip===myName && s.week===nextWeek(curWeek))
+    return { current: cw, next: nw }
+  }, [db.weeklyShifts, myName, curWeek])
 
   const myReportsWeek = useMemo(()=>{
-    const rep = db.reports.filter(r => r.dip===myName);
+    const rep = db.reports.filter(r => r.dip===myName)
     return rep.filter(r => {
-      const [y,m,d] = r.date.split('-').map(Number);
-      const ws = weekStr(isoWeekInfo(new Date(y, m-1, d)));
-      return ws === curWeek;
-    });
-  }, [db.reports, myName, curWeek]);
+      const [y,m,d] = r.date.split('-').map(Number)
+      const ws = weekStr(isoWeekInfo(new Date(y, m-1, d)))
+      return ws === curWeek
+    })
+  }, [db.reports, myName, curWeek])
 
   function login(u,p){
-    const f = USERS.find(x => x.username===u && x.pwd===p);
-    if(!f) { alert('Credenziali errate'); return; }
-    setUser(f);
+    const f = USERS.find(x => x.username===u && x.pwd===p)
+    if(!f) { alert('Credenziali errate'); return }
+    setUser(f)
   }
 
   function NavLink({to, children}){
@@ -210,7 +250,7 @@ export default function App(){
 
 // ---------- Components ----------
 function Login({ onLogin }){
-  const [u,setU]=useState(''); const [p,setP]=useState('');
+  const [u,setU]=useState(''); const [p,setP]=useState('')
   return <div className="grid cols-2" style={{alignItems:'start'}}>
     <div className="card"><h3>Accedi</h3><div className="body">
       <div className="row"><input placeholder="Username (es. responsabile)" value={u} onChange={e=>setU(e.target.value)} /></div>
@@ -222,7 +262,7 @@ function Login({ onLogin }){
 }
 
 function Home({ user, shifts, tasks, posts, notifications }){
-  const isResp = user.role==='Responsabile';
+  const isResp = user.role==='Responsabile'
   return <div className="grid cols-2">
     <div className="card"><h3>{isResp?'📊 Turni settimanali assegnati':'📅 Il mio turno (settimana)'}</h3><div className="body">
       {shifts.length===0? <div className="muted">Nessun turno.</div> :
@@ -259,21 +299,21 @@ function Home({ user, shifts, tasks, posts, notifications }){
   </div>
 }
 
-function Turni({ myShifts, curWeek }){
+function Turni({ myShifts }){
   return <div className="card"><h3>Turni</h3><div className="body">
       {myShifts.current.length===0 && myShifts.next.length===0 ? <div className="muted">Nessun turno.</div> :
         <>
           <h4>Settimana corrente</h4>
           <table><thead><tr><th>Periodo</th><th>Orario</th><th>Sede</th></tr></thead><tbody>
             {myShifts.current.map(s => {
-              const period = s.startDate && s.endDate ? `${s.startDate} → ${s.endDate}` : (s.week || '—');
+              const period = s.startDate && s.endDate ? `${s.startDate} → ${s.endDate}` : (s.week || '—')
               return <tr key={s.id}><td>{period}</td><td>{s.hours}</td><td>{s.site||'—'}</td></tr>
             })}
           </tbody></table>
           <h4>Prossima settimana</h4>
           <table><thead><tr><th>Periodo</th><th>Orario</th><th>Sede</th></tr></thead><tbody>
             {myShifts.next.map(s => {
-              const period = s.startDate && s.endDate ? `${s.startDate} → ${s.endDate}` : (s.week || '—');
+              const period = s.startDate && s.endDate ? `${s.startDate} → ${s.endDate}` : (s.week || '—')
               return <tr key={s.id}><td>{period}</td><td>{s.hours}</td><td>{s.site||'—'}</td></tr>
             })}
           </tbody></table>
@@ -299,34 +339,34 @@ function Rapportini({ user, db, setDb, myReports }){
         [ore,setOre]=useState(8),
         [site,setSite]=useState(''),
         [descr,setDescr]=useState(''),
-        [photos,setPhotos]=useState([]);
+        [photos,setPhotos]=useState([])
 
-  const commessaSel = db.commesse.find(c=>c.id===commessaId) || null;
-  const posOpts = commessaSel?.posizioni || [];
-  const siteLocked = !!commessaSel?.boundSite && commessaSel.lockSite;
+  const commessaSel = db.commesse.find(c=>c.id===commessaId) || null
+  const posOpts = commessaSel?.posizioni || []
+  const siteLocked = !!commessaSel?.boundSite && commessaSel.lockSite
 
-  useEffect(()=>{ if (commessaSel?.boundSite) setSite(commessaSel.boundSite); }, [commessaId]);
+  useEffect(()=>{ if (commessaSel?.boundSite) setSite(commessaSel.boundSite) }, [commessaId])
 
   async function onPickPhoto(e){
-    const f = e.target.files && e.target.files[0];
-    if (!f) return;
+    const f = e.target.files && e.target.files[0]
+    if (!f) return
     try {
-      const dataUrl = await readImageAsDataURL(f);
-      setPhotos(p => [...p, dataUrl]);
-    } catch { alert('Errore lettura foto'); }
-    e.target.value = '';
+      const dataUrl = await readImageAsDataURL(f)
+      setPhotos(p => [...p, dataUrl])
+    } catch { alert('Errore lettura foto') }
+    e.target.value = ''
   }
 
   function send(){
     if(!commessaId || !posizioneId || !descr.trim() || (!site && !siteLocked))
-      return alert('Compila commessa, posizione, cantiere e descrizione.');
+      return alert('Compila commessa, posizione, cantiere e descrizione.')
     const payload = {
       id: uid(), date, dip: user.name, commessaId, posizioneId,
       ore: Number(ore)||0, site: siteLocked? (commessaSel.boundSite||'') : site,
       descr: descr.trim(), stato: 'Inviato', noteResp: '', photos: [...photos]
-    };
-    setDb(prev => ({...prev, reports: [payload, ...prev.reports]}));
-    setOre(8); setSite(''); setDescr(''); setPhotos([]);
+    }
+    setDb(prev => ({...prev, reports: [payload, ...prev.reports]}))
+    setOre(8); setSite(''); setDescr(''); setPhotos([])
   }
 
   return <div className="grid cols-2">
@@ -334,7 +374,7 @@ function Rapportini({ user, db, setDb, myReports }){
       <div className="row"><label>Data</label><input type="date" value={date} onChange={e=>setDate(e.target.value)} /></div>
       <div className="row"><label>Ore</label><input type="number" min="0" max="24" value={ore} onChange={e=>setOre(e.target.value)} /></div>
       <div className="row"><label>Commessa</label>
-        <select value={commessaId} onChange={e=>{setCommessaId(e.target.value); setPosizioneId('');}}>
+        <select value={commessaId} onChange={e=>{setCommessaId(e.target.value); setPosizioneId('')}}>
           <option value="">— seleziona —</option>
           {db.commesse.filter(c=>c.active).map(c=> <option key={c.id} value={c.id}>{c.code} — {c.desc}</option>)}
         </select>
@@ -364,9 +404,9 @@ function Rapportini({ user, db, setDb, myReports }){
       {myReports.length===0? <div className="muted">Ancora nessun rapportino per questa settimana.</div> :
         <div style={{overflowX:"auto"}}><table style={{minWidth:1200}}><thead><tr><th>Data</th><th>Commessa</th><th>Posizione</th><th>Cantiere</th><th>Ore</th><th>Stato</th><th>Foto</th></tr></thead><tbody>
           {myReports.map(r=>{
-            const comm = db.commesse.find(c=>c.id===r.commessaId)?.code || '—';
-            const pos = db.commesse.flatMap(c=>c.posizioni).find(p=>p.id===r.posizioneId)?.name || '—';
-            const badge = r.stato==='Approvato'?'appr':r.stato==='Modificato'?'mod':r.stato==='Respinto'?'rej':'sent';
+            const comm = db.commesse.find(c=>c.id===r.commessaId)?.code || '—'
+            const pos = db.commesse.flatMap(c=>c.posizioni).find(p=>p.id===r.posizioneId)?.name || '—'
+            const badge = r.stato==='Approvato'?'appr':r.stato==='Modificato'?'mod':r.stato==='Respinto'?'rej':'sent'
             return (<tr key={r.id}>
               <td>{r.date}</td><td>{comm}</td><td>{pos}</td><td>{r.site||'—'}</td><td>{r.ore}</td>
               <td><span className={'badge '+badge}>{r.stato}</span></td>
@@ -380,32 +420,28 @@ function Rapportini({ user, db, setDb, myReports }){
 }
 
 function Bacheca({ posts, isResp, onAdd }){
-  const [t,setT]=useState(''); const [b,setB]=useState('');
-  const [editId,setEditId]=useState(null);
-  const [eTitle,setETitle]=useState('');
-  const [eBody,setEBody]=useState('');
+  const [t,setT]=useState(''); const [b,setB]=useState('')
+  const [editId,setEditId]=useState(null)
+  const [eTitle,setETitle]=useState('')
+  const [eBody,setEBody]=useState('')
 
-  // We need access to DB setter; since original signature didn't pass it, we mutate via onAdd for new posts,
-  // and render edit/delete only if a global setter is available via window._setDb (fallback hidden if absent).
-  const canManage = isResp && typeof window !== 'undefined' && typeof window._setDb === 'function';
+  const canManage = isResp && typeof window !== 'undefined' && typeof window._setDb === 'function'
 
   function doAdd(){
-    if(!t.trim() || !b.trim()) return;
-    onAdd(t,b); setT(''); setB('');
+    if(!t.trim() || !b.trim()) return
+    onAdd(t,b); setT(''); setB('')
   }
-
   function delPost(id){
-    if(!canManage) return;
-    window._setDb(p => ({...p, posts: p.posts.filter(x=>x.id!==id)}));
+    if(!canManage) return
+    window._setDb(p => ({...p, posts: p.posts.filter(x=>x.id!==id)}))
   }
-
   function startEdit(p){
-    setEditId(p.id); setETitle(p.title); setEBody(p.body);
+    setEditId(p.id); setETitle(p.title); setEBody(p.body)
   }
   function saveEdit(){
-    if(!canManage || !editId) return;
-    window._setDb(p => ({...p, posts: p.posts.map(x=> x.id===editId ? {...x, title:eTitle, body:eBody} : x)}));
-    setEditId(null); setETitle(''); setEBody('');
+    if(!canManage || !editId) return
+    window._setDb(p => ({...p, posts: p.posts.map(x=> x.id===editId ? {...x, title:eTitle, body:eBody} : x)}))
+    setEditId(null); setETitle(''); setEBody('')
   }
 
   return <div className="grid cols-2">
@@ -446,51 +482,52 @@ function Bacheca({ posts, isResp, onAdd }){
         </div>
       }
     </div></div>
-  </div>;
+  </div>
 }
 
 // ---------------- Amministrazione ----------------
 function Admin({ db, setDb }){
   // --- State: commesse ---
-  const [newCommCode,setNewCommCode]=useState('');
-  const [newCommDesc,setNewCommDesc]=useState('');
-  const [newBoundSite,setNewBoundSite]=useState('');
-  const [newLock,setNewLock]=useState(true);
+  const [newCommCode,setNewCommCode]=useState('')
+  const [newCommDesc,setNewCommDesc]=useState('')
+  const [newBoundSite,setNewBoundSite]=useState('')
+  const [newLock,setNewLock]=useState(true)
 
   // --- State: posizioni ---
-  const [posCommessaId,setPosCommessaId]=useState('');
-  const [posName,setPosName]=useState('');
+  const [posCommessaId,setPosCommessaId]=useState('')
+  const [posName,setPosName]=useState('')
 
   // --- State: task/attività ---
-  const [tDip,setTDip]=useState('');
-  const [tDate,setTDate]=useState(today());
-  const [tTitle,setTTitle]=useState('');
-  const [tPhoto,setTPhoto]=useState('');
+  const [tDip,setTDip]=useState('')
+  const [tDate,setTDate]=useState(today())
+  const [tTitle,setTTitle]=useState('')
+  const [tPhoto,setTPhoto]=useState('')
 
   // --- State: rapportini moderation ---
-  const [rFilterDip,setRFilterDip]=useState('');
-  const [rFilterState,setRFilterState]=useState('inviato'); // tutti | inviati | approvati | respinti
-  const [rNote,setRNote]=useState(''); // richiesta motivazione quando respingi
-  const [editId,setEditId]=useState(null);
-  const [editHours,setEditHours]=useState('');
-  const [editDesc,setEditDesc]=useState('');
+  const [rFilterDip,setRFilterDip]=useState('')
+  const [rFilterState,setRFilterState]=useState('inviato') // tutti | inviati | approvati | respinti
+  const [rNote,setRNote]=useState('') // richiesta motivazione quando respingi
+  const [editId,setEditId]=useState(null)
+  const [editHours,setEditHours]=useState('')
+  const [editDesc,setEditDesc]=useState('')
 
   // --- State: turni ---
-  const [wWeek,setWWeek]=useState(weekStr(isoWeekInfo())); const [wStart,setWStart]=useState(''); const [wEnd,setWEnd]=useState('');
+  const [wWeek,setWWeek]=useState(weekStr(isoWeekInfo()))
+  const [wStart,setWStart]=useState('')
+  const [wEnd,setWEnd]=useState('')
   const derivedWeek = useMemo(()=>{
-    const d = wStart || wEnd || '';
-    if(!d) return wWeek;
-    try { return weekStr(isoWeekInfo(new Date(d))); } catch(e){ return wWeek; }
-  }, [wStart, wEnd, wWeek]);
-  const [wDip,setWDip]=useState('');
-  const [wHours,setWHours]=useState('08:00–17:00');
-  const [wSite,setWSite]=useState('');
+    const d = wStart || wEnd || ''
+    if(!d) return wWeek
+    try { return weekStr(isoWeekInfo(new Date(d))) } catch(e){ return wWeek }
+  }, [wStart, wEnd, wWeek])
+  const [wDip,setWDip]=useState('')
+  const [wHours,setWHours]=useState('08:00–17:00')
+  const [wSite,setWSite]=useState('')
 
-  // Helpers
-  const usersDip = USERS.filter(u=>u.role==='Dipendente');
+  const usersDip = USERS.filter(u=>u.role==='Dipendente')
 
   function addComm(){
-    if(!newCommCode.trim()) return;
+    if(!newCommCode.trim()) return
     setDb(p => ({
       ...p,
       commesse: [...p.commesse, {
@@ -502,77 +539,73 @@ function Admin({ db, setDb }){
         active: true,
         posizioni: []
       }]
-    }));
-    setNewCommCode(''); setNewCommDesc(''); setNewBoundSite(''); setNewLock(true);
+    }))
+    setNewCommCode(''); setNewCommDesc(''); setNewBoundSite(''); setNewLock(true)
   }
   function toggleCommessaActive(cid){
-    setDb(p => ({ ...p, commesse: p.commesse.map(c => c.id===cid ? {...c, active: !c.active} : c) }));
+    setDb(p => ({ ...p, commesse: p.commesse.map(c => c.id===cid ? {...c, active: !c.active} : c) }))
   }
   function delCommessa(cid){
-    if(!confirm('Eliminare la commessa? I rapportini collegati perderanno il riferimento.')) return;
+    if(!confirm('Eliminare la commessa? I rapportini collegati perderanno il riferimento.')) return
     setDb(p => ({
       ...p,
       commesse: p.commesse.filter(c => c.id!==cid),
       reports: p.reports.map(r => (r.commessaId===cid ? {...r, commessaId:'', posizioneId:''} : r))
-    }));
+    }))
   }
   function addPosizione(){
-    if(!posCommessaId || !posName.trim()) return;
+    if(!posCommessaId || !posName.trim()) return
     setDb(p => ({
       ...p,
       commesse: p.commesse.map(c => c.id===posCommessaId ? {
         ...c,
         posizioni: [...(c.posizioni||[]), { id: uid(), name: posName.trim() }]
       } : c)
-    }));
-    setPosName('');
+    }))
+    setPosName('')
   }
   function delPosizione(cid, pid){
     setDb(p => ({
       ...p,
       commesse: p.commesse.map(c => c.id===cid ? {...c, posizioni: c.posizioni.filter(pp => pp.id!==pid)} : c),
       reports: p.reports.map(r => (r.posizioneId===pid ? {...r, posizioneId:''} : r))
-    }));
+    }))
   }
 
   // Rapportini moderation
   function approveReport(id){
-    setDb(p => ({...p, reports: p.reports.map(r => r.id===id ? {...r, state:'approvato', note:''} : r)}));
+    setDb(p => ({...p, reports: p.reports.map(r => r.id===id ? {...r, state:'approvato', note:''} : r)}))
   }
   function rejectReport(id){
-    const note = prompt('Motivo del rifiuto (obbligatorio):', rNote||'');
-    if(!note || !note.trim()) return;
-    setDb(p => ({...p, reports: p.reports.map(r => r.id===id ? {...r, state:'respinto', note:note.trim()} : r)}));
-    setRNote('');
+    const note = prompt('Motivo del rifiuto (obbligatorio):', rNote||'')
+    if(!note || !note.trim()) return
+    setDb(p => ({...p, reports: p.reports.map(r => r.id===id ? {...r, state:'respinto', note:note.trim()} : r)}))
+    setRNote('')
   }
   function startEdit(r){
-    setEditId(r.id); setEditHours(String(r.hours||r.ore||'8')); setEditDesc(r.desc||r.descr||'');
+    setEditId(r.id); setEditHours(String(r.hours||r.ore||'8')); setEditDesc(r.desc||r.descr||'')
   }
   function saveEdit(id){
-    setDb(p => ({...p, reports: p.reports.map(r => r.id===id ? {...r, hours: Number(editHours)||0, desc: editDesc} : r)}));
-    setEditId(null); setEditHours(''); setEditDesc('');
+    setDb(p => ({...p, reports: p.reports.map(r => r.id===id ? {...r, hours: Number(editHours)||0, desc: editDesc} : r)}))
+    setEditId(null); setEditHours(''); setEditDesc('')
   }
 
-  // Filtro rapportini
   const rapFiltered = db.reports
     .filter(r => !rFilterDip || r.dip===rFilterDip)
     .filter(r => rFilterState==='tutti' ? true : r.state===rFilterState)
-    .sort((a,b)=> (a.date||'').localeCompare(b.date||''));
+    .sort((a,b)=> (a.date||'').localeCompare(b.date||''))
 
-  // Turni
   function addShift(){
-    if(!wDip || !wWeek) return;
-    setDb(p => ({...p, weeklyShifts: [{ id: uid(), dip: wDip, week: derivedWeek, startDate:wStart||undefined, endDate:wEnd||undefined, hours: wHours, site: wSite }, ...p.weeklyShifts]}));
-    setWDip(''); setWSite('');
+    if(!wDip || !wWeek) return
+    setDb(p => ({...p, weeklyShifts: [{ id: uid(), dip: wDip, week: derivedWeek, startDate:wStart||undefined, endDate:wEnd||undefined, hours: wHours, site: wSite }, ...p.weeklyShifts]}))
+    setWDip(''); setWSite('')
   }
   function delShift(id){
-    setDb(p => ({...p, weeklyShifts: p.weeklyShifts.filter(s => s.id!==id)}));
+    setDb(p => ({...p, weeklyShifts: p.weeklyShifts.filter(s => s.id!==id)}))
   }
-  const shiftsWeek = db.weeklyShifts.filter(s => s.week===wWeek);
+  const shiftsWeek = db.weeklyShifts.filter(s => s.week===wWeek)
 
-  // --- UI ---
   return <div className="grid cols-2">
-    {/* COMMESSE */}
     <div className="card">
       <h3>Nuova commessa</h3>
       <div className="body">
@@ -612,7 +645,6 @@ function Admin({ db, setDb }){
       </div>
     </div>
 
-    {/* POSIZIONI */}
     <div className="card">
       <h3>Posizioni di commessa</h3>
       <div className="body">
@@ -625,17 +657,16 @@ function Admin({ db, setDb }){
           <button onClick={addPosizione}>Aggiungi posizione</button>
         </div>
         {posCommessaId && (()=>{
-          const c = db.commesse.find(x=>x.id===posCommessaId);
+          const c = db.commesse.find(x=>x.id===posCommessaId)
           return c && c.posizioni && c.posizioni.length>0 ?
             <table><thead><tr><th>Posizione</th><th>Azioni</th></tr></thead><tbody>
               {c.posizioni.map(p => <tr key={p.id}><td>{p.name}</td><td><button onClick={()=>delPosizione(c.id, p.id)}>Rimuovi</button></td></tr>)}
             </tbody></table>
-            : <div className="muted">Nessuna posizione per questa commessa.</div>;
+            : <div className="muted">Nessuna posizione per questa commessa.</div>
         })()}
       </div>
     </div>
 
-    {/* RAPPORTINI DIPENDENTI */}
     <div className="card" style={{gridColumn:'1 / -1'}}>
       <h3>Rapportini dipendenti</h3>
       <div className="body">
@@ -656,9 +687,9 @@ function Admin({ db, setDb }){
             <tr><th>Data</th><th>Dipendente</th><th>Commessa</th><th>Posizione</th><th>Ore</th><th>Descrizione</th><th>Stato</th><th>Azioni</th></tr>
           </thead><tbody>
             {rapFiltered.map(r => {
-              const c = db.commesse.find(x=>x.id===r.commessaId);
-              const pos = c?.posizioni?.find(p=>p.id===r.posizioneId);
-              const isEditing = editId===r.id;
+              const c = db.commesse.find(x=>x.id===r.commessaId)
+              const pos = c?.posizioni?.find(p=>p.id===r.posizioneId)
+              const isEditing = editId===r.id
               return <tr key={r.id}>
                 <td>{r.date}</td>
                 <td>{r.dip}</td>
@@ -679,12 +710,13 @@ function Admin({ db, setDb }){
       </div>
     </div>
 
-    {/* TURNI SETTIMANALI */}
     <div className="card">
       <h3>Turni</h3>
       <div className="body">
         <div className="row">
-          <span className="pill">Settimana: {derivedWeek}</span><input type="date" value={wStart||""} onChange={e=>{const v=e.target.value; setWStart(v); try{ setWWeek(weekStr(isoWeekInfo(new Date(v)))); }catch(_){}}} placeholder="Inizio" /><input type="date" value={wEnd||""} onChange={e=>{const v=e.target.value; setWEnd(v); try{ setWWeek(weekStr(isoWeekInfo(new Date(v)))); }catch(_){}}} placeholder="Fine" />
+          <span className="pill">Settimana: {derivedWeek}</span>
+          <input type="date" value={wStart||""} onChange={e=>{const v=e.target.value; setWStart(v); try{ setWWeek(weekStr(isoWeekInfo(new Date(v)))); }catch(_){}}} placeholder="Inizio" />
+          <input type="date" value={wEnd||""} onChange={e=>{const v=e.target.value; setWEnd(v); try{ setWWeek(weekStr(isoWeekInfo(new Date(v)))); }catch(_){}}} placeholder="Fine" />
           <select value={wDip} onChange={e=>setWDip(e.target.value)}>
             <option value="">— dipendente —</option>
             {usersDip.map(u=> <option key={u.username} value={u.name}>{u.name}</option>)}
@@ -701,7 +733,6 @@ function Admin({ db, setDb }){
       </div>
     </div>
 
-    {/* ASSEGNA ATTIVITÀ */}
     <div className="card">
       <h3>Assegna attività (opzionale)</h3>
       <div className="body">
@@ -722,43 +753,42 @@ function Admin({ db, setDb }){
         <div className="muted">Le attività assegnate sono visibili nella Home del dipendente selezionato.</div>
       </div>
     </div>
-  </div>;
+  </div>
 }
 
-
-
 // ---------------- Dashboard (Responsabile) ----------------
-function Dashboard({ db, curWeek }){ const [month,setMonth]=useState(new Date().toISOString().slice(0,7));
-  const [fDip,setFDip]=useState('');
-  const [fComm,setFComm]=useState('');
-  const dips=[...new Set(db.reports.map(r=>r.dip))].filter(Boolean);
-  const comms=db.commesse;
+function Dashboard({ db, curWeek }){
+  const [month,setMonth]=useState(new Date().toISOString().slice(0,7))
+  const [fDip,setFDip]=useState('')
+  const [fComm,setFComm]=useState('')
+  const dips=[...new Set(db.reports.map(r=>r.dip))].filter(Boolean)
+  const comms=db.commesse
 
   const filt = db.reports.filter(r=>{
-    const [y,m,d]=r.date.split('-').map(Number);
-    const ws = weekStr(isoWeekInfo(new Date(y, m-1, d)));
-    return ws===curWeek && (!fDip || r.dip===fDip) && (!fComm || r.commessaId===fComm);
-  });
+    const [y,m,d]=r.date.split('-').map(Number)
+    const ws = weekStr(isoWeekInfo(new Date(y, m-1, d)))
+    return ws===curWeek && (!fDip || r.dip===fDip) && (!fComm || r.commessaId===fComm)
+  })
 
-  const sum = (arr,fn)=> arr.reduce((s,x)=> s+(fn(x)||0), 0);
-  const oreTot = sum(filt, r=>Number(r.hours||r.ore||r.h||0)||0);
+  const sum = (arr,fn)=> arr.reduce((s,x)=> s+(fn(x)||0), 0)
+  const oreTot = sum(filt, r=>Number(r.hours||r.ore||r.h||0)||0)
 
-  const byDip = {};
-  const byComm = {};
+  const byDip = {}
+  const byComm = {}
   filt.forEach(r=>{
-    byDip[r.dip]=(byDip[r.dip]||0)+(Number(r.hours||r.ore||0)||0);
-    byComm[r.commessaId]=(byComm[r.commessaId]||0)+(Number(r.hours||r.ore||0)||0);
-  });
+    byDip[r.dip]=(byDip[r.dip]||0)+(Number(r.hours||r.ore||0)||0)
+    byComm[r.commessaId]=(byComm[r.commessaId]||0)+(Number(r.hours||r.ore||0)||0)
+  })
   const commName = id => {
-    const c = comms.find(x=>x.id===id);
-    return c ? (c.code + (c.desc? ' — '+c.desc : '')) : '—';
-  };
-  const maxDip = Math.max(1, ...Object.values(byDip));
-  const maxComm = Math.max(1, ...Object.values(byComm));
+    const c = comms.find(x=>x.id===id)
+    return c ? (c.code + (c.desc? ' — '+c.desc : '')) : '—'
+  }
+  const maxDip = Math.max(1, ...Object.values(byDip))
+  const maxComm = Math.max(1, ...Object.values(byComm))
 
   const Bar = ({value,max}) => <div style={{background:'#f2f2f2',border:'1px solid var(--line)',borderRadius:10}}>
     <div style={{height:10,width: `${Math.round((value/max)*100)}%`}} />
-  </div>;
+  </div>
 
   return <div className="grid cols-2">
     <div className="card"><h3>Filtri (settimana {curWeek})</h3><div className="body">
@@ -791,58 +821,56 @@ function Dashboard({ db, curWeek }){ const [month,setMonth]=useState(new Date().
 
     <div className="card"><h3>Ore per dipendente (mese {month})</h3><div className="body">{
       (()=>{
-        const filt=db.reports.filter(r=>r.date && r.date.slice(0,7)===month);
-        const agg={}; filt.forEach(r=>{agg[r.dip]=(agg[r.dip]||0)+(Number(r.hours||r.ore||0)||0)});
-        const max=Math.max(1,...Object.values(agg));
-        const Bar=({value,max})=> <div style={{background:'#f2f2f2',border:'1px solid var(--line)',borderRadius:10}}><div style={{height:10,width:`${Math.round((value/max)*100)}%`}}/></div>;
+        const filt=db.reports.filter(r=>r.date && r.date.slice(0,7)===month)
+        const agg={}; filt.forEach(r=>{agg[r.dip]=(agg[r.dip]||0)+(Number(r.hours||r.ore||0)||0)})
+        const max=Math.max(1,...Object.values(agg))
+        const Bar=({value,max})=> <div style={{background:'#f2f2f2',border:'1px solid var(--line)',borderRadius:10}}><div style={{height:10,width:`${Math.round((value/max)*100)}%`}}/></div>
         return Object.keys(agg).length===0? <div className="muted">Nessun dato nel mese selezionato.</div> :
           <><div className="row"><input type="month" value={month} onChange={e=>setMonth(e.target.value)} /></div>
           <table><thead><tr><th>Dipendente</th><th>Ore</th><th style={{width:220}}>Grafico</th></tr></thead><tbody>
             {Object.entries(agg).map(([k,v])=> <tr key={k}><td>{k}</td><td>{v}</td><td><Bar value={v} max={max} /></td></tr>)}
-          </tbody></table></>;
-      })()
+          </tbody></table></>
+      )()
     }</div></div>
-  </div>;
+  </div>
 }
 
 // ---------------- ReportOre (Responsabile) ----------------
 function ReportOre({ db, curWeek }){
-  const [fComm,setFComm]=useState('');
-  const [fPos,setFPos]=useState('');
+  const [fComm,setFComm]=useState('')
+  const [fPos,setFPos]=useState('')
 
-  const comm = db.commesse;
-  const curCom = comm.find(c=>c.id===fComm);
-  const posList = curCom?.posizioni||[];
+  const comm = db.commesse
+  const curCom = comm.find(c=>c.id===fComm)
+  const posList = curCom?.posizioni||[]
 
-  // Build rows (weekly totals by commessa/posizione)
-  const rows = [];
+  const rows = []
   for(const c of comm){
-    const positions = c.posizioni || [];
+    const positions = c.posizioni || []
     if(positions.length===0){
       const tot = db.reports.filter(r => r.commessaId===c.id).filter(r=>{
-        const [y,m,d] = r.date.split('-').map(Number);
-        const ws = weekStr(isoWeekInfo(new Date(y, m-1, d)));
-        return ws===curWeek;
-      }).reduce((s,r)=> s + (Number(r.hours||r.ore||r.h||0)||0), 0);
-      rows.push({ key: c.id+'_none', commessa: c.code, posizione: '—', ore: tot });
+        const [y,m,d] = r.date.split('-').map(Number)
+        const ws = weekStr(isoWeekInfo(new Date(y, m-1, d)))
+        return ws===curWeek
+      }).reduce((s,r)=> s + (Number(r.hours||r.ore||r.h||0)||0), 0)
+      rows.push({ key: c.id+'_none', commessa: c.code, posizione: '—', ore: tot })
     } else {
       for(const p of positions){
         const tot = db.reports.filter(r => r.commessaId===c.id && r.posizioneId===p.id).filter(r=>{
-          const [y,m,d] = r.date.split('-').map(Number);
-          const ws = weekStr(isoWeekInfo(new Date(y, m-1, d)));
-          return ws===curWeek;
-        }).reduce((s,r)=> s + (Number(r.hours||r.ore||r.h||0)||0), 0);
-        rows.push({ key: c.id+'_'+p.id, commessaId:c.id, posId:p.id, commessa: c.code, posizione: p.name, ore: tot });
+          const [y,m,d] = r.date.split('-').map(Number)
+          const ws = weekStr(isoWeekInfo(new Date(y, m-1, d)))
+          return ws===curWeek
+        }).reduce((s,r)=> s + (Number(r.hours||r.ore||r.h||0)||0), 0)
+        rows.push({ key: c.id+'_'+p.id, commessaId:c.id, posId:p.id, commessa: c.code, posizione: p.name, ore: tot })
       }
     }
   }
-  rows.sort((a,b)=> a.commessa.localeCompare(b.commessa) || a.posizione.localeCompare(b.posizione));
+  rows.sort((a,b)=> a.commessa.localeCompare(b.commessa) || a.posizione.localeCompare(b.posizione))
 
-  // Daily detail filtered by selection
   const details = db.reports
     .filter(r => !fComm || r.commessaId===fComm)
     .filter(r => !fPos || r.posizioneId===fPos)
-    .sort((a,b)=> (a.date||'').localeCompare(b.date||''));
+    .sort((a,b)=> (a.date||'').localeCompare(b.date||''))
 
   return <div className="grid cols-2">
     <div className="card"><h3>Report ore (settimana {curWeek})</h3><div className="body">
@@ -852,7 +880,7 @@ function ReportOre({ db, curWeek }){
             <td><button className="ghost" onClick={()=>{ setFComm(r.commessaId||''); setFPos(r.posId||''); }}>Dettagli</button></td></tr>)}
         </tbody></table>}
       <div className="row" style={{marginTop:8}}>
-        <select value={fComm} onChange={e=>{setFComm(e.target.value); setFPos('');}}>
+        <select value={fComm} onChange={e=>{setFComm(e.target.value); setFPos('')}}>
           <option value="">— commessa —</option>
           {comm.map(c=> <option key={c.id} value={c.id}>{c.code} — {c.desc}</option>)}
         </select>
@@ -869,5 +897,5 @@ function ReportOre({ db, curWeek }){
           {details.map(r => <tr key={r.id}><td>{r.date}</td><td>{r.dip}</td><td>{r.hours||r.ore||0}</td><td>{r.desc||r.descr||''}</td></tr>)}
         </tbody></table>}
     </div></div>
-  </div>;
+  </div>
 }
