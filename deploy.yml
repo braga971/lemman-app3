@@ -16,6 +16,7 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: cp dist/index.html dist/404.html
+      - run: echo app.lemman.it > dist/CNAME 
       - uses: actions/upload-pages-artifact@v3
         with: { path: 'dist' }
   deploy:
